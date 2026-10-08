@@ -4,7 +4,7 @@ from pathlib import Path
 from PIL import Image
 import streamlit as st
 
-# ReportLab imports for exact PDF layout generation
+# ReportLab imports for precise PDF layout generation
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
@@ -59,13 +59,14 @@ BASE_DIR = Path(__file__).parent
 
 PATH_IES_LOGO = BASE_DIR / "ies_logo.png"
 PATH_ESM_MARK = BASE_DIR / "esm_mark.png"
+PATH_EFF_MARK = BASE_DIR / "eff_mark.png"
 PATH_EMBLEM = BASE_DIR / "Emblem_of_Ethiopia.svg.png"
 
 # ==========================================
-# 3. SIDEBAR FORM INPUTS (EXACT TEMPLATE FIELDS)
+# 3. SIDEBAR FORM INPUTS & MARK SELECTION
 # ==========================================
 st.markdown("### Institute of Ethiopian Standards (IES)")
-st.markdown("Enter the exact certificate parameters below to generate the official pre-licence PDF.")
+st.markdown("Configure the official certificate parameters and select the appropriate standard mark below.")
 
 with st.form("pre_license_form"):
     st.markdown("#### Certificate Data Fields")
@@ -85,6 +86,10 @@ with st.form("pre_license_form"):
         pre_licence_no = st.text_input("Pre-Licence Number", value="ESML-AOI-CA9009")
         issue_date = st.text_input("Issue Date", value="07-10-2026")
         valid_until = st.text_input("Valid Until", value="07-10-2026")
+        mark_selection = st.selectbox(
+            "Standard Mark Selection", 
+            ["Ethiopian Standard Mark (ESM)", "EFF Conformance Mark"]
+        )
         remark = st.text_input("Remark", value="CHECKED AND VERIFIED")
 
     submitted = st.form_submit_button("Generate Exact PDF Certificate")
@@ -106,14 +111,13 @@ def generate_pdf(data):
     story = []
     styles = getSampleStyleSheet()
     
-    # Custom styles matching the exact document layout
     title_style = ParagraphStyle(
         'CertTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
         fontSize=13,
         leading=16,
-        alignment=1, # Center
+        alignment=1,
         textColor=colors.HexColor('#000000')
     )
     
@@ -171,7 +175,7 @@ def generate_pdf(data):
     story.append(Paragraph("PRE LABELING - LICENSE", subtitle_style))
     story.append(Spacer(1, 15))
 
-    # 3. Metadata Table (Left: Exact Fields, Right: ESM Mark)
+    # 3. Metadata Table (Left: Fields, Right: Selected Mark)
     fields_text = f"""
     <b>Client Name:</b> {data['client_name']}<br/>
     <b>Product Type:</b> {data['product_type']}<br/>
@@ -189,10 +193,14 @@ def generate_pdf(data):
     
     p_fields = Paragraph(fields_text, field_style)
     
-    if PATH_ESM_MARK.exists():
-        esm_img = RLImage(str(PATH_ESM_MARK), width=105, height=105)
-        esm_img.hAlign = 'CENTER'
-        mark_table = Table([[esm_img], [Paragraph("<font size=7 color='#CC0000'><b>ብሔራዊ የስታንዳርድ ምልክት</b><br/>National Standards Mark</font>", ParagraphStyle('Center', alignment=1))]], colWidths=[130])
+    # Determine which mark to render based on user selection
+    target_mark_path = PATH_ESM_MARK if "ESM" in data['mark_selection'] else PATH_EFF_MARK
+    mark_label_text = "ብሔራዊ የስታንዳርድ ምልክት<br/>National Standards Mark" if "ESM" in data['mark_selection'] else "የኢነርጂ ቅልጥፍና ምልክት<br/>Energy Efficiency Mark"
+
+    if target_mark_path.exists():
+        mark_img = RLImage(str(target_mark_path), width=105, height=105)
+        mark_img.hAlign = 'CENTER'
+        mark_table = Table([[mark_img], [Paragraph(f"<font size=7 color='#CC0000'><b>{mark_label_text}</b></font>", ParagraphStyle('Center', alignment=1))]], colWidths=[130])
         table_data = [[p_fields, mark_table]]
     else:
         table_data = [[p_fields, ""]]
@@ -251,7 +259,7 @@ def generate_pdf(data):
 # 5. EXECUTION & DOWNLOAD
 # ==========================================
 if submitted:
-    st.success("Official Certificate PDF generated successfully matching exact template specs!")
+    st.success("Official Certificate PDF generated successfully with selected mark and CAB parameters!")
     
     form_data = {
         "client_name": client_name,
@@ -265,6 +273,7 @@ if submitted:
         "pre_licence_no": pre_licence_no,
         "issue_date": issue_date,
         "valid_until": valid_until,
+        "mark_selection": mark_selection,
         "remark": remark
     }
     
@@ -277,4 +286,4 @@ if submitted:
         mime="application/pdf"
     )
 else:
-    st.info("👈 Verify the exact template parameters in the sidebar and click **Generate Exact PDF Certificate**.")
+    st.info("👈 Select your parameters and mark type in the sidebar, then click **Generate Exact PDF Certificate**.")
