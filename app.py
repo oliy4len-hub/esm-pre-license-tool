@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from PIL import Image
@@ -40,7 +40,7 @@ st.markdown(
             color: white;
             font-weight: 600;
             border-radius: 4px;
-            padding: 0.5rem 1rem;
+            padding: 0.6rem 1.2rem;
             border: none;
         }
         .stButton>button:hover {
@@ -63,36 +63,57 @@ PATH_EFF_MARK = BASE_DIR / "eff_mark.png"
 PATH_EMBLEM = BASE_DIR / "Emblem_of_Ethiopia.svg.png"
 
 # ==========================================
-# 3. SIDEBAR FORM INPUTS & MARK SELECTION
+# 3. STRUCTURED EXECUTIVE FORM INPUTS (WITH CALENDAR TOOLS)
 # ==========================================
-st.markdown("### Institute of Ethiopian Standards (IES)")
-st.markdown("Configure the official certificate parameters and select the appropriate standard mark below.")
+st.markdown('<div class="main-header">Institute of Ethiopian Standards (IES)</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Certification Scheme & Standard Mark Administration | Pre-License Generation Portal</div>', unsafe_allow_html=True)
 
 with st.form("pre_license_form"):
-    st.markdown("#### Certificate Data Fields")
-    col_s1, col_s2 = st.columns(2)
     
-    with col_s1:
-        client_name = st.text_input("Client Name", value="ALEM")
-        product_type = st.text_input("Product Type", value="OIL")
-        brand_name = st.text_input("Brand", value="IFNAN")
-        address_location = st.text_input("Address", value="AA")
-        standard_ref = st.text_input("Standard Reference Number", value="ES 1212")
-        cab_name = st.text_input("CAB Name", value="ECAE")
+    # SECTION 1
+    st.markdown("### 1. Client & Product Information")
+    col_f1, col_f2 = st.columns(2)
+    
+    with col_f1:
+        client_name = st.text_input("Client Name", value="ALEM", placeholder="e.g., Apex Manufacturing PLC")
+        product_type = st.text_input("Product Type", value="OIL", placeholder="e.g., Edible Vegetable Oil")
+        brand_name = st.text_input("Brand", value="IFNAN", placeholder="e.g., Golden Sunshine")
         
-    with col_s2:
-        cab_number = st.text_input("CAB Number", value="9009")
-        date_applied = st.text_input("Date Applied", value="06-10-2026")
-        pre_licence_no = st.text_input("Pre-Licence Number", value="ESML-AOI-CA9009")
-        issue_date = st.text_input("Issue Date", value="07-10-2026")
-        valid_until = st.text_input("Valid Until", value="07-10-2026")
+    with col_f2:
+        address_location = st.text_input("Address / Location", value="AA", placeholder="e.g., Addis Ababa, Ethiopia")
+        standard_ref = st.text_input("Standard Reference Number", value="ES 1212", placeholder="e.g., ES 1234:2024")
+
+    st.markdown("---")
+
+    # SECTION 2
+    st.markdown("### 2. Conformity Assessment & Licensing Details")
+    col_f3, col_f4 = st.columns(2)
+    
+    with col_f3:
+        cab_name = st.text_input("CAB Name", value="ECAE", placeholder="e.g., Ethiopian Conformity Assessment Enterprise")
+        cab_number = st.text_input("CAB Number", value="9009", placeholder="e.g., 9009")
+        
+        # Calendar tool for Date Applied
+        date_applied_val = st.date_input("Date Applied", value=datetime.now().date())
+        
+        pre_licence_no = st.text_input("Pre-Licence Number", value="ESML-AOI-CA9009", placeholder="e.g., ESML-TD-CA9009")
+        
+    with col_f4:
+        # Calendar tool for Issue Date
+        issue_date_val = st.date_input("Issue Date", value=datetime.now().date())
+        
+        # Automatic 6-month validity calculation (Issue Date + 180 days)
+        valid_until_val = issue_date_val + timedelta(days=180)
+        st.date_input("Valid Until (Auto: Issue Date + 6 Months)", value=valid_until_val, disabled=True)
+        
         mark_selection = st.selectbox(
             "Standard Mark Selection", 
             ["Ethiopian Standard Mark (ESM)", "EFF Conformance Mark"]
         )
-        remark = st.text_input("Remark", value="CHECKED AND VERIFIED")
+        remark = st.text_input("Remark", value="CHECKED AND VERIFIED", placeholder="Any specific remarks...")
 
-    submitted = st.form_submit_button("Generate Exact PDF Certificate")
+    st.markdown("---")
+    submitted = st.form_submit_button("Generate Official Pre-Licence PDF Certificate")
 
 # ==========================================
 # 4. PDF GENERATION ENGINE
@@ -115,8 +136,8 @@ def generate_pdf(data):
         'CertTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=13,
-        leading=16,
+        fontSize=12,
+        leading=15,
         alignment=1,
         textColor=colors.HexColor('#000000')
     )
@@ -162,17 +183,15 @@ def generate_pdf(data):
 
     # 1. Header Logo
     if PATH_IES_LOGO.exists():
-        logo_img = RLImage(str(PATH_IES_LOGO), width=130, height=50)
+        logo_img = RLImage(str(PATH_IES_LOGO), width=140, height=55)
         logo_img.hAlign = 'CENTER'
         story.append(logo_img)
-        story.append(Spacer(1, 8))
+        story.append(Spacer(1, 10))
 
     # 2. Header Titles
     story.append(Paragraph("INSTITUTE OF ETHIOPIAN STANDARDS (IES)", title_style))
-    story.append(Spacer(1, 3))
-    story.append(Paragraph("NATIONAL STANDARD MARK", subtitle_style))
-    story.append(Spacer(1, 3))
-    story.append(Paragraph("PRE LABELING - LICENSE", subtitle_style))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph("NATIONAL STANDARD MARK PRE LABELING LICENSE", subtitle_style))
     story.append(Spacer(1, 15))
 
     # 3. Metadata Table (Left: Fields, Right: Selected Mark)
@@ -193,12 +212,11 @@ def generate_pdf(data):
     
     p_fields = Paragraph(fields_text, field_style)
     
-    # Determine which mark to render based on user selection
     target_mark_path = PATH_ESM_MARK if "ESM" in data['mark_selection'] else PATH_EFF_MARK
     mark_label_text = "ብሔራዊ የስታንዳርድ ምልክት<br/>National Standards Mark" if "ESM" in data['mark_selection'] else "የኢነርጂ ቅልጥፍና ምልክት<br/>Energy Efficiency Mark"
 
     if target_mark_path.exists():
-        mark_img = RLImage(str(target_mark_path), width=105, height=105)
+        mark_img = RLImage(str(target_mark_path), width=110, height=110)
         mark_img.hAlign = 'CENTER'
         mark_table = Table([[mark_img], [Paragraph(f"<font size=7 color='#CC0000'><b>{mark_label_text}</b></font>", ParagraphStyle('Center', alignment=1))]], colWidths=[130])
         table_data = [[p_fields, mark_table]]
@@ -244,7 +262,7 @@ def generate_pdf(data):
     # 6. Footer Note
     story.append(Paragraph("Note: This pre-licence is not valid unless it bears the official stamp of the Institute.", note_style))
 
-    # Background Watermark Callback
+    # 7. Background Watermark Callback
     def add_watermark(canvas_obj, doc_obj):
         canvas_obj.saveState()
         if PATH_EMBLEM.exists():
@@ -259,7 +277,7 @@ def generate_pdf(data):
 # 5. EXECUTION & DOWNLOAD
 # ==========================================
 if submitted:
-    st.success("Official Certificate PDF generated successfully with selected mark and CAB parameters!")
+    st.success("Official Certificate PDF generated successfully matching your exact layout specifications!")
     
     form_data = {
         "client_name": client_name,
@@ -269,10 +287,10 @@ if submitted:
         "standard_ref": standard_ref,
         "cab_name": cab_name,
         "cab_number": cab_number,
-        "date_applied": date_applied,
+        "date_applied": date_applied_val.strftime('%d-%m-%Y'),
         "pre_licence_no": pre_licence_no,
-        "issue_date": issue_date,
-        "valid_until": valid_until,
+        "issue_date": issue_date_val.strftime('%d-%m-%Y'),
+        "valid_until": valid_until_val.strftime('%d-%m-%Y'),
         "mark_selection": mark_selection,
         "remark": remark
     }
@@ -280,10 +298,10 @@ if submitted:
     pdf_buffer = generate_pdf(form_data)
     
     st.download_button(
-        label="📥 Download Official Pre-Licence PDF",
+        label="📥 Download Official Pre-Licence PDF Certificate",
         data=pdf_buffer,
         file_name=f"Pre_Licence_{client_name}.pdf",
         mime="application/pdf"
     )
 else:
-    st.info("👈 Select your parameters and mark type in the sidebar, then click **Generate Exact PDF Certificate**.")
+    st.info("💡 Fill out the structured sections above and click **Generate Official Pre-Licence PDF Certificate**.")
