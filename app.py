@@ -1,8 +1,14 @@
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 import streamlit as st
+
+# ReportLab imports for exact PDF layout generation
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 # ==========================================
 # 1. PAGE CONFIGURATION & STYLING
@@ -29,13 +35,6 @@ st.markdown(
             font-weight: 500;
             margin-bottom: 2rem;
         }
-        .card {
-            background-color: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            border-left: 5px solid #2d6a4f;
-            margin-bottom: 1.5rem;
-        }
         .stButton>button {
             background-color: #2d6a4f;
             color: white;
@@ -60,176 +59,222 @@ BASE_DIR = Path(__file__).parent
 
 PATH_IES_LOGO = BASE_DIR / "ies_logo.png"
 PATH_ESM_MARK = BASE_DIR / "esm_mark.png"
-PATH_EFF_MARK = BASE_DIR / "eff_mark.png"
 PATH_EMBLEM = BASE_DIR / "Emblem_of_Ethiopia.svg.png"
-PATH_FONT = BASE_DIR / "GillSansMTCondensed.ttf"
-
-
-def load_image(path: Path):
-  if path.exists():
-    return Image.open(path)
-  return None
-
-
-img_ies_logo = load_image(PATH_IES_LOGO)
-img_esm_mark = load_image(PATH_ESM_MARK)
-img_eff_mark = load_image(PATH_EFF_MARK)
-img_emblem = load_image(PATH_EMBLEM)
 
 # ==========================================
-# 3. HEADER & INSTITUTIONAL BRANDING
+# 3. SIDEBAR FORM INPUTS (EXACT TEMPLATE FIELDS)
 # ==========================================
-col_logo1, col_title, col_logo2 = st.columns([1, 4, 1])
-
-with col_logo1:
-  if img_emblem:
-    st.image(img_emblem, width=90)
-
-with col_title:
-  st.markdown(
-      '<div class="main-header">Institute of Ethiopian Standards (IES)</div>',
-      unsafe_allow_html=True,
-  )
-  st.markdown(
-      '<div class="sub-header">National Standard Mark Pre-License Generator'
-      " | Certification Scheme & Standard Mark Administration</div>",
-      unsafe_allow_html=True,
-  )
-
-with col_logo2:
-  if img_ies_logo:
-    st.image(img_ies_logo, width=90)
-
-st.markdown("---")
-
-# ==========================================
-# 4. COMPREHENSIVE INPUT FORM & PARAMETERS
-# ==========================================
-st.markdown("### Fill out the official details below to generate and download the secure pre-license document.")
+st.markdown("### Institute of Ethiopian Standards (IES)")
+st.markdown("Enter the exact certificate parameters below to generate the official pre-licence PDF.")
 
 with st.form("pre_license_form"):
-  st.markdown("#### 1. Client & Product Information")
-  col_f1, col_f2 = st.columns(2)
-  
-  with col_f1:
-    client_name = st.text_input("Client Name", placeholder="e.g., Apex Manufacturing PLC")
-    product_type = st.text_input("Product Type", placeholder="e.g., Edible Vegetable Oil")
-    brand_name = st.text_input("Brand Name", placeholder="e.g., Golden Sunshine")
+    st.markdown("#### Certificate Data Fields")
+    col_s1, col_s2 = st.columns(2)
     
-  with col_f2:
-    address_location = st.text_input("Address / Location", placeholder="e.g., Addis Ababa, Ethiopia")
-    standard_ref = st.text_input("Standard Reference Number", placeholder="e.g., ES 1234:2024")
-    tin_number = st.text_input("TIN Number", placeholder="e.g., 0012345678")
+    with col_s1:
+        client_name = st.text_input("Client Name", value="ALEM")
+        product_type = st.text_input("Product Type", value="OIL")
+        brand_name = st.text_input("Brand", value="IFNAN")
+        address_location = st.text_input("Address", value="AA")
+        standard_ref = st.text_input("Standard Reference Number", value="ES 1212")
+        cab_name = st.text_input("CAB Name", value="ECAE")
+        
+    with col_s2:
+        cab_number = st.text_input("CAB Number", value="9009")
+        date_applied = st.text_input("Date Applied", value="06-10-2026")
+        pre_licence_no = st.text_input("Pre-Licence Number", value="ESML-AOI-CA9009")
+        issue_date = st.text_input("Issue Date", value="07-10-2026")
+        valid_until = st.text_input("Valid Until", value="07-10-2026")
+        remark = st.text_input("Remark", value="CHECKED AND VERIFIED")
 
-  st.markdown("#### 2. Conformity Assessment & Licensing Details")
-  col_f3, col_f4 = st.columns(2)
-  
-  with col_f3:
-    cab_name = st.text_input("CAB Name", placeholder="e.g., Ethiopian Conformity Assessment Enterprise")
-    validity_period = st.selectbox("Pre-License Validity Duration", ["3 Months", "6 Months", "1 Year"])
-    
-  with col_f4:
-    issue_date = st.text_input("Issue Date", value=datetime.now().strftime('%Y-%m-%d'))
-    license_scope = st.text_area("Scope of License / Certified Lines", placeholder="Specify authorized product lines and variants...")
-
-  submitted = st.form_submit_button("Generate Pre-License Document")
+    submitted = st.form_submit_button("Generate Exact PDF Certificate")
 
 # ==========================================
-# 5. PREVIEW & GENERATION OUTPUT
+# 4. PDF GENERATION ENGINE
+# ==========================================
+def generate_pdf(data):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=30,
+        bottomMargin=30
+    )
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles matching the exact document layout
+    title_style = ParagraphStyle(
+        'CertTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=13,
+        leading=16,
+        alignment=1, # Center
+        textColor=colors.HexColor('#000000')
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CertSubTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=15,
+        alignment=1,
+        textColor=colors.HexColor('#000000')
+    )
+
+    field_style = ParagraphStyle(
+        'FieldStyle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=15,
+        textColor=colors.HexColor('#000000')
+    )
+
+    disclaimer_style = ParagraphStyle(
+        'DisclaimerStyle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=9,
+        leading=13,
+        alignment=1,
+        textColor=colors.HexColor('#FF0000')
+    )
+
+    note_style = ParagraphStyle(
+        'NoteStyle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=11,
+        alignment=1,
+        textColor=colors.HexColor('#000000')
+    )
+
+    # 1. Header Logo
+    if PATH_IES_LOGO.exists():
+        logo_img = RLImage(str(PATH_IES_LOGO), width=130, height=50)
+        logo_img.hAlign = 'CENTER'
+        story.append(logo_img)
+        story.append(Spacer(1, 8))
+
+    # 2. Header Titles
+    story.append(Paragraph("INSTITUTE OF ETHIOPIAN STANDARDS (IES)", title_style))
+    story.append(Spacer(1, 3))
+    story.append(Paragraph("NATIONAL STANDARD MARK", subtitle_style))
+    story.append(Spacer(1, 3))
+    story.append(Paragraph("PRE LABELING - LICENSE", subtitle_style))
+    story.append(Spacer(1, 15))
+
+    # 3. Metadata Table (Left: Exact Fields, Right: ESM Mark)
+    fields_text = f"""
+    <b>Client Name:</b> {data['client_name']}<br/>
+    <b>Product Type:</b> {data['product_type']}<br/>
+    <b>Brand:</b> {data['brand_name']}<br/>
+    <b>Address:</b> {data['address_location']}<br/>
+    <b>Standard Reference Number:</b> {data['standard_ref']}<br/>
+    <b>CAB Name:</b> {data['cab_name']}<br/>
+    <b>CAB Number:</b> {data['cab_number']}<br/>
+    <b>Date Applied:</b> {data['date_applied']}<br/>
+    <b>Pre-Licence Number:</b> {data['pre_licence_no']}<br/>
+    <b>Issue Date:</b> {data['issue_date']}<br/>
+    <b>Valid Until:</b> {data['valid_until']}<br/>
+    <b>Remark:</b> {data['remark']}
+    """
+    
+    p_fields = Paragraph(fields_text, field_style)
+    
+    if PATH_ESM_MARK.exists():
+        esm_img = RLImage(str(PATH_ESM_MARK), width=105, height=105)
+        esm_img.hAlign = 'CENTER'
+        mark_table = Table([[esm_img], [Paragraph("<font size=7 color='#CC0000'><b>ብሔራዊ የስታንዳርድ ምልክት</b><br/>National Standards Mark</font>", ParagraphStyle('Center', alignment=1))]], colWidths=[130])
+        table_data = [[p_fields, mark_table]]
+    else:
+        table_data = [[p_fields, ""]]
+
+    content_table = Table(table_data, colWidths=[350, 170])
+    content_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,0), (1,0), 'CENTER'),
+    ]))
+    
+    story.append(content_table)
+    story.append(Spacer(1, 15))
+
+    # 4. Disclaimer
+    disclaimer_text = "Disclaimer: The client code can be reassigned to other clients if the holder fails to present the product certificate within the validity period."
+    story.append(Paragraph(disclaimer_text, disclaimer_style))
+    story.append(Spacer(1, 20))
+
+    # 5. Signatures and Stamps
+    sig_data = [
+        [
+            Paragraph("<b>Authorized Signature:</b>", field_style),
+            Paragraph("<b>Official Stamp:</b>", field_style)
+        ],
+        [
+            Spacer(1, 25),
+            Spacer(1, 25)
+        ],
+        [
+            Paragraph("____________________________", field_style),
+            Paragraph("____________________________", field_style)
+        ]
+    ]
+    sig_table = Table(sig_data, colWidths=[250, 250])
+    sig_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+    ]))
+    story.append(sig_table)
+    story.append(Spacer(1, 15))
+
+    # 6. Footer Note
+    story.append(Paragraph("Note: This pre-licence is not valid unless it bears the official stamp of the Institute.", note_style))
+
+    # Background Watermark Callback
+    def add_watermark(canvas_obj, doc_obj):
+        canvas_obj.saveState()
+        if PATH_EMBLEM.exists():
+            canvas_obj.drawImage(str(PATH_EMBLEM), 130, 160, width=340, height=340, mask='auto', preserveAspectRatio=True)
+        canvas_obj.restoreState()
+
+    doc.build(story, onFirstPage=add_watermark, onLaterPages=add_watermark)
+    buffer.seek(0)
+    return buffer
+
+# ==========================================
+# 5. EXECUTION & DOWNLOAD
 # ==========================================
 if submitted:
-  if not client_name or not standard_ref:
-    st.error("Please provide at least the mandatory Client Name and Standard Reference Number fields.")
-  else:
-    st.success(f"Pre-License data successfully processed for **{client_name}** under Scheme Ownership.")
-
-    st.markdown(
-        """
-        <div class="card">
-            <h3>Official Pre-License Authorization Summary</h3>
-            <p>The form data below has been compiled for conformance verification under the National Standards Body guidelines.</p>
-        </div>
-    """,
-        unsafe_allow_html=True,
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-      st.markdown("### **Enterprise Profile**")
-      st.write(f"**Client Name:** {client_name}")
-      st.write(f"**TIN Number:** {tin_number if tin_number else 'N/A'}")
-      st.write(f"**Address / Location:** {address_location if address_location else 'N/A'}")
-      st.write(f"**CAB Name:** {cab_name if cab_name else 'N/A'}")
-
-    with col2:
-      st.markdown("### **Product & Standard Parameters**")
-      st.write(f"**Product Type:** {product_type if product_type else 'N/A'}")
-      st.write(f"**Brand Name:** {brand_name if brand_name else 'N/A'}")
-      st.write(f"**Standard Reference:** {standard_ref}")
-      st.write(f"**Validity Duration:** {validity_period}")
-
-    if license_scope:
-      st.markdown("**Scope of License:**")
-      st.info(license_scope)
-
-    st.markdown("---")
-
-    # Display Conformance Marks
-    st.markdown("### **Authorized Standard Marks & Insignia**")
-    mark_col1, mark_col2, mark_col3 = st.columns(3)
-
-    with mark_col1:
-      if img_esm_mark:
-        st.image(img_esm_mark, caption="Ethiopian Standard Mark (ESM)", width=150)
-      else:
-        st.info("ESM Mark asset pending.")
-
-    with mark_col2:
-      if img_eff_mark:
-        st.image(img_eff_mark, caption="EFF Conformance Mark", width=150)
-      else:
-        st.info("EFF Mark asset pending.")
-
-    with mark_col3:
-      if img_ies_logo:
-        st.image(img_ies_logo, caption="NSB Scheme Ownership", width=150)
-      else:
-        st.info("IES Logo asset pending.")
-
-    # Export Section
-    st.markdown("---")
-    st.subheader("📥 Export & Official Distribution")
-
-    document_summary = (
-        f"INSTITUTE OF ETHIOPIAN STANDARDS (IES)\n"
-        f"NATIONAL STANDARD MARK PRE-LICENSE CERTIFICATE\n"
-        f"==================================================\n"
-        f"Client Name: {client_name}\n"
-        f"Address / Location: {address_location}\n"
-        f"TIN Number: {tin_number}\n"
-        f"Product Type: {product_type}\n"
-        f"Brand Name: {brand_name}\n"
-        f"Standard Reference: {standard_ref}\n"
-        f"CAB Name: {cab_name}\n"
-        f"Issue Date: {issue_date}\n"
-        f"Validity Period: {validity_period}\n"
-        f"License Scope: {license_scope}\n"
-    )
-
+    st.success("Official Certificate PDF generated successfully matching exact template specs!")
+    
+    form_data = {
+        "client_name": client_name,
+        "product_type": product_type,
+        "brand_name": brand_name,
+        "address_location": address_location,
+        "standard_ref": standard_ref,
+        "cab_name": cab_name,
+        "cab_number": cab_number,
+        "date_applied": date_applied,
+        "pre_licence_no": pre_licence_no,
+        "issue_date": issue_date,
+        "valid_until": valid_until,
+        "remark": remark
+    }
+    
+    pdf_buffer = generate_pdf(form_data)
+    
     st.download_button(
-        label="Download Official Pre-License Summary (.txt)",
-        data=document_summary,
-        file_name=f"Pre_License_{client_name.replace(' ', '_')}.txt",
-        mime="text/plain",
+        label="📥 Download Official Pre-Licence PDF",
+        data=pdf_buffer,
+        file_name=f"Pre_Licence_{client_name}.pdf",
+        mime="application/pdf"
     )
-
 else:
-  st.info("💡 Fill out the form above with your complete client and product specifications, then click **Generate Pre-License Document**.")
-
-  with st.expander("System Diagnostic: Asset Verification Status"):
-    st.write(f"- **IES Logo (`ies_logo.png`):** {'✅ Loaded' if img_ies_logo else '❌ Missing'}")
-    st.write(f"- **ESM Mark (`esm_mark.png`):** {'✅ Loaded' if img_esm_mark else '❌ Missing'}")
-    st.write(f"- **EFF Mark (`eff_mark.png`):** {'✅ Loaded' if img_eff_mark else '❌ Missing'}")
-    st.write(f"- **National Emblem (`Emblem_of_Ethiopia.svg.png`):** {'✅ Loaded' if img_emblem else '❌ Missing'}")
-    st.write(f"- **Custom Font (`GillSansMTCondensed.ttf`):** {'✅ Present' if PATH_FONT.exists() else '❌ Missing'}")
+    st.info("👈 Verify the exact template parameters in the sidebar and click **Generate Exact PDF Certificate**.")
