@@ -62,6 +62,12 @@ PATH_ESM_MARK = BASE_DIR / "esm_mark.png"
 PATH_EFF_MARK = BASE_DIR / "eff_mark.png"
 PATH_EMBLEM = BASE_DIR / "Emblem_of_Ethiopia.svg.png"
 
+# Initialize session state for persistent downloads
+if "pdf_buffer" not in st.session_state:
+    st.session_state.pdf_buffer = None
+if "client_filename" not in st.session_state:
+    st.session_state.client_filename = "Pre_Licence.pdf"
+
 # ==========================================
 # 3. STRUCTURED EXECUTIVE FORM INPUTS (WITH CALENDAR TOOLS)
 # ==========================================
@@ -274,11 +280,9 @@ def generate_pdf(data):
     return buffer
 
 # ==========================================
-# 5. EXECUTION & DOWNLOAD
+# 5. EXECUTION & SESSION STATE PERSISTENCE
 # ==========================================
 if submitted:
-    st.success("Official Certificate PDF generated successfully matching your exact layout specifications!")
-    
     form_data = {
         "client_name": client_name,
         "product_type": product_type,
@@ -295,12 +299,19 @@ if submitted:
         "remark": remark
     }
     
-    pdf_buffer = generate_pdf(form_data)
-    
+    # Store buffer in session state so it doesn't get cleared on rerun
+    st.session_state.pdf_buffer = generate_pdf(form_data)
+    st.session_state.client_filename = f"Pre_Licence_{client_name}.pdf"
+    st.success("Official Certificate PDF generated successfully!")
+
+# Always render the download button outside the form if the PDF exists in session state
+if st.session_state.pdf_buffer is not None:
+    st.markdown("---")
+    st.markdown("### 📥 Download Certificate")
     st.download_button(
         label="📥 Download Official Pre-Licence PDF Certificate",
-        data=pdf_buffer,
-        file_name=f"Pre_Licence_{client_name}.pdf",
+        data=st.session_state.pdf_buffer,
+        file_name=st.session_state.client_filename,
         mime="application/pdf"
     )
 else:
